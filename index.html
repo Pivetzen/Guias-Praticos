@@ -214,9 +214,12 @@
     <script>
         const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ'; 
         
-        // Adicionado timestamp dinâmico (?t=...) para quebrar qualquer cache do Google de forma agressiva
-        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Guias&t=${Date.now()}`;
-        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Anuncios&t=${Date.now()}`;
+        // ⚠️ ATENÇÃO: Substitua o número '0' abaixo pelo GID real da sua aba "Anuncios" obtido na URL da planilha
+        const ANUNCIOS_GID = '1363143951'; 
+
+        // URLs estruturadas usando o parâmetro estrito de identificação por GID
+        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=0&t=${Date.now()}`;
+        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&gid=${ANUNCIOS_GID}&t=${Date.now()}`;
 
         let allGuides = [];
         let allAds = [];
@@ -263,15 +266,14 @@
             return basePath + cleanPath;
         }
 
-        // Processa a aba Anúncios validando rigorosamente o cabeçalho correto
         function parseAdsCSV(text) {
             const lines = csvToArray(text);
             if (lines.length < 2) return [];
 
-            // Validação de Segurança: verifica se o cabeçalho realmente pertence à aba de Anúncios
+            // Validação estrita por conteúdo das colunas
             const firstRowText = lines[0].join('').toLowerCase();
-            if (firstRowText.includes('linkhotmart') || firstRowText.includes('descri') || firstRowText.includes('tando seu caozinho')) {
-                console.warn("Aviso: O Google Sheets retornou a aba errada (Guias) ao tentar carregar os Anúncios.");
+            if (firstRowText.includes('linkhotmart') || firstRowText.includes('descri')) {
+                console.error("Erro Crítico: O link de anúncios continua a descarregar a aba de Guias. Verifique o GID configurado.");
                 return [];
             }
 
@@ -293,15 +295,12 @@
             return objects;
         }
 
-        // Processa a aba Guias validando rigorosamente o cabeçalho correto
         function parseGuidesCSV(text) {
             const lines = csvToArray(text);
             if (lines.length < 2) return [];
 
-            // Validação de Segurança: verifica se o cabeçalho não pertence à aba de Anúncios
             const firstRowText = lines[0].join('').toLowerCase();
             if (firstRowText.includes('imagembanner') || firstRowText.includes('linkdestino')) {
-                console.warn("Aviso: O Google Sheets retornou a aba errada (Anúncios) ao tentar carregar os Guias.");
                 return [];
             }
 
@@ -324,7 +323,7 @@
         async function initAds() {
             try {
                 const response = await fetch(ADS_URL, { cache: "no-store" });
-                if (!response.ok) throw new Error("Erro ao baixar aba de anúncios");
+                if (!response.ok) throw new Error("Erro de rede ao baixar anúncios");
                 const csvText = await response.text();
                 
                 allAds = parseAdsCSV(csvText);
@@ -335,12 +334,10 @@
                     
                     rotateAds();
                     if (allAds.length > 1) {
-                        // Limpa qualquer intervalo anterior para evitar duplicações
                         if (window.adInterval) clearInterval(window.adInterval);
                         window.adInterval = setInterval(rotateAds, 5000);
                     }
                 } else {
-                    // Oculta completamente o container se os dados vierem inválidos ou vazios
                     document.getElementById('adContainer').style.display = 'none';
                 }
             } catch (error) {
@@ -376,7 +373,7 @@
         async function initGuides() {
             try {
                 const response = await fetch(GUIDES_URL, { cache: "no-store" });
-                if (!response.ok) throw new Error("Erro ao baixar aba de guias");
+                if (!response.ok) throw new Error("Erro de rede ao baixar guias");
                 const csvText = await response.text();
                 
                 allGuides = parseGuidesCSV(csvText);
