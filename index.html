@@ -221,7 +221,6 @@
         let allAds = [];
         let currentAdIndex = 0;
 
-        // Transforma o texto bruto do CSV em uma matriz pura de linhas e colunas
         function csvToArray(text) {
             const lines = [];
             let row = [""];
@@ -250,7 +249,6 @@
             return lines.filter(line => line.some(cell => cell.trim() !== ''));
         }
 
-        // Reconstrói URLs de forma limpa para evitar erros de caminhos no GitHub Pages
         function buildAbsoluteURL(rawPath) {
             if (!rawPath) return '';
             if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
@@ -264,24 +262,19 @@
             return basePath + cleanPath;
         }
 
-        // Processa especificamente a estrutura da aba de Anúncios de forma posicional (independente de falhas de cabeçalho)
+        // Mapeia rigidamente as posições da aba Anúncios: Coluna 0 (Imagem), Coluna 1 (Link), Coluna 2 (Alt)
         function parseAdsCSV(text) {
             const lines = csvToArray(text);
             if (lines.length < 2) return [];
 
             const objects = [];
-            // Localiza os índices reais baseado no que foi limpo na primeira linha
-            const headers = lines[0].map(h => h.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
-            
-            const idxImg = headers.indexOf('imagembanner');
-            const idxLink = headers.indexOf('linkdestino');
-            const idxAlt = headers.indexOf('alttext');
 
             for (let i = 1; i < lines.length; i++) {
                 const row = lines[i];
-                const imgVal = row[idxImg !== -1 ? idxImg : 0];
-                const linkVal = row[idxLink !== -1 ? idxLink : 1];
-                const altVal = row[idxAlt !== -1 ? idxAlt : 2];
+                // Pega estritamente pelos índices das colunas da aba Anúncios
+                const imgVal = row[0]; 
+                const linkVal = row[1];
+                const altVal = row[2];
 
                 if (imgVal && imgVal.trim() !== '') {
                     objects.push({
@@ -294,17 +287,16 @@
             return objects;
         }
 
-        // Processa especificamente a estrutura da aba de Guias
+        // Mapeia rigidamente as posições da aba Guias: 0 (Título), 1 (Categoria), 2 (Descrição), 3 (Link), 4 (Imagem)
         function parseGuidesCSV(text) {
             const lines = csvToArray(text);
             if (lines.length < 2) return [];
 
             const objects = [];
-            const headers = lines[0].map(h => h.replace(/[^a-zA-Z0-9Título|titulo]/g, '').trim());
 
             for (let i = 1; i < lines.length; i++) {
                 const row = lines[i];
-                if (row.length === 0 || !row[0]) continue;
+                if (!row[0] || row[0].trim() === '') continue;
 
                 objects.push({
                     Título: row[0] ? row[0].trim() : '',
@@ -349,6 +341,7 @@
             if (!ad.ImagemBanner) return;
 
             img.style.opacity = 0;
+            img.style.display = 'block'; 
             
             link.href = ad.LinkDestino || "#";
             link.title = ad.AltText || "Propaganda";
