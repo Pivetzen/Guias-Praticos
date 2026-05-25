@@ -264,7 +264,6 @@
                     obj[header] = val;
                 });
                 
-                // Validação explícita baseada nas colunas existentes de cada aba
                 if (headers.includes('Título') || headers.includes('titulo')) {
                     const titulo = obj['Título'] || obj['titulo'] || obj['TITULO'];
                     if (titulo) {
@@ -379,6 +378,8 @@
             grid.innerHTML = '';
 
             guides.forEach(guide => {
+                const descricaoExibida = (guide.Descrição && guide.Descrição.toLowerCase() !== 'teste') ? guide.Descrição : 'Acesse o material completo de forma rápida e segura diretamente pela Hotmart.';
+                
                 const card = document.createElement('article');
                 card.className = 'guide-card';
                 card.innerHTML = `
@@ -389,7 +390,7 @@
                     <div class="guide-content">
                         <span class="guide-category">${guide.Categoria}</span>
                         <h2 class="guide-title">${guide.Título}</h2>
-                        <p class="guide-description">${guide.Descrição}</p>
+                        <p class="guide-description">${descricaoExibida}</p>
                         <a href="${guide.LinkHotmart}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
                     </div>
                 `;
