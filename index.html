@@ -52,8 +52,8 @@
             border-radius: var(--border-radius);
             overflow: hidden;
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            aspect-ratio: 728 / 90; /* Proporção padrão de banner horizontal */
-            display: none; /* Inicia oculto até carregar os dados */
+            aspect-ratio: 728 / 90;
+            display: none;
         }
 
         .ad-banner-container a {
@@ -167,7 +167,6 @@
             background-color: #218838;
         }
 
-        /* Mensagem de carregamento ou lista vazia */
         .status-msg {
             text-align: center;
             grid-column: 1 / -1;
@@ -177,7 +176,7 @@
 
         @media (max-width: 600px) {
             .ad-banner-container {
-                aspect-ratio: 320 / 50; /* Proporção mobile para banners */
+                aspect-ratio: 320 / 50;
             }
             header h1 {
                 font-size: 1.8rem;
@@ -209,10 +208,9 @@
     </div>
 
     <script>
-        // CONFIGURAÇÃO: Insira aqui o ID da sua planilha do Google Sheets publicado na web
-        const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ';
+        // CONFIGURAÇÃO: Certifique-se de que a planilha está em "Arquivo > Compartilhar > Publicar na Web"
+        const SPREADSHEET_ID = '1Xf1mYhLpYt6_Wc8Mh6F-8FfW0u3_P3R6Y-5S8Xz9GvI'; 
         
-        // URLs para puxar os dados das abas específicas em formato CSV
         const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Guias`;
         const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Anuncios`;
 
@@ -220,43 +218,62 @@
         let allAds = [];
         let currentAdIndex = 0;
 
-        // Função utilitária para converter CSV em Array de Objetos
-        function csvToObjects(csvText) {
-            const lines = csvText.split('\n');
-            const result = [];
-            if (lines.length < 2) return result;
-            
-            // Limpa aspas extras que o Google Sheets coloca
-            const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
-            
-            for (let i = 1; i < lines.length; i++) {
-                if (!lines[i].trim()) continue;
-                
-                // Regex para separar por vírgulas, respeitando aspas
-                const matches = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
-                const obj = {};
-                
-                headers.forEach((header, index) => {
-                    let val = matches[index] ? matches[index].replace(/^"|"$/g, '').trim() : '';
-                    obj[header] = val;
-                });
-                result.push(obj);
+        // Parser de CSV robusto para lidar com as aspas e vírgulas do Google Sheets
+        function parseCSV(text) {
+            const lines = [];
+            let row = [""];
+            let inQuotes = false;
+
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                let next = text[i+1];
+
+                if (c === '"') {
+                    if (inQuotes && next === '"') { row[row.length - 1] += '"'; i++; }
+                    else { inQuotes = !inQuotes; }
+                } else if (c === ',' && !inQuotes) {
+                    row.push('');
+                } else if ((c === '\r' || c === '\n') && !inQuotes) {
+                    if (c === '\r' && next === '\n') { i++; }
+                    lines.push(row);
+                    row = [''];
+                } else {
+                    row[row.length - 1] += c;
+                }
             }
-            return result;
+            if (row.length > 1 || row[0] !== '') {
+                lines.push(row);
+            }
+            
+            if (lines.length < 2) return [];
+
+            const headers = lines[0].map(h => h.trim());
+            const objects = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i];
+                if (values.length < headers.length) continue;
+                
+                const obj = {};
+                headers.forEach((header, index) => {
+                    obj[header] = values[index] ? values[index].trim() : '';
+                });
+                objects.push(obj);
+            }
+            return objects;
         }
 
-        // Carrega e gerencia os anúncios (Banner)
+        // Carrega e gerencia os anúncios
         async function initAds() {
             try {
-                const response = await fetch(ADS_URL);
+                const response = await fetch(ADS_URL, { cache: "no-store" });
                 const csvText = await response.text();
-                allAds = csvToObjects(csvText);
+                allAds = parseCSV(csvText);
 
                 if (allAds.length > 0) {
                     const container = document.getElementById('adContainer');
                     container.style.display = 'block';
                     rotateAds();
-                    // Alterna o banner a cada 5 segundos (5000 milissegundos)
                     setInterval(rotateAds, 5000);
                 }
             } catch (error) {
@@ -271,28 +288,27 @@
             const img = document.getElementById('adImage');
             const link = document.getElementById('adLink');
             
-            // Suaviza a troca alterando opacidade
             img.style.opacity = 0;
             
             setTimeout(() => {
-                img.src = ad.ImagemBanner;
-                img.alt = ad.AltText || "Propaganda";
-                link.href = ad.LinkDestino;
+                img.src = ad.ImagemBanner || ad.imagemBanner; 
+                img.alt = ad.AltText || ad.altText || "Propaganda";
+                link.href = ad.LinkDestino || ad.linkDestino;
                 img.style.opacity = 1;
             }, 200);
 
             currentAdIndex = (currentAdIndex + 1) % allAds.length;
         }
 
-        // Carrega e renderiza os guias e botões de filtros
+        // Carrega e renderiza os guias
         async function initGuides() {
             try {
-                const response = await fetch(GUIDES_URL);
+                const response = await fetch(GUIDES_URL, { cache: "no-store" });
                 const csvText = await response.text();
-                allGuides = csvToObjects(csvText);
+                allGuides = parseCSV(csvText);
 
                 if (allGuides.length === 0) {
-                    document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Nenhum guia encontrado.</div>';
+                    document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Nenhum guia encontrado na planilha.</div>';
                     return;
                 }
 
@@ -300,14 +316,16 @@
                 renderGuides(allGuides);
             } catch (error) {
                 console.error("Erro ao carregar guias:", error);
-                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Verifique a configuração da planilha.</div>';
+                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Verifique os nomes das abas da planilha.</div>';
             }
         }
 
-        // Cria os botões de filtros dinamicamente com base nas categorias existentes
         function renderFilters() {
             const container = document.getElementById('filterContainer');
-            const categories = [...new Set(allGuides.map(g => g.Categoria))].filter(Boolean);
+            // Remove botões antigos se houver, mantendo apenas o 'Todos'
+            container.innerHTML = '<button class="filter-btn active" onclick="filterGuides(\'todos\', this)">Todos</button>';
+            
+            const categories = [...new Set(allGuides.map(g => g.Categoria || g.categoria))].filter(Boolean);
             
             categories.forEach(cat => {
                 const btn = document.createElement('button');
@@ -318,42 +336,44 @@
             });
         }
 
-        // Renderiza os cards na tela
         function renderGuides(guides) {
             const grid = document.getElementById('guidesGrid');
             grid.innerHTML = '';
 
             guides.forEach(guide => {
+                const titulo = guide.Título || guide.titulo;
+                const categoria = guide.Categoria || guide.categoria;
+                const descricao = guide.Descrição || guide.descricao;
+                const link = guide.LinkHotmart || guide.linkHotmart;
+                const imgUrl = guide.URLImagem || guide.urlImagem;
+
                 const card = document.createElement('article');
                 card.className = 'guide-card';
                 card.innerHTML = `
-                    <img src="${guide.URLImagem || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" class="guide-image" alt="${guide.Título}">
+                    <img src="${imgUrl || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" class="guide-image" alt="${titulo}">
                     <div class="guide-content">
-                        <span class="guide-category">${guide.Categoria}</span>
-                        <h2 class="guide-title">${guide.Título}</h2>
-                        <p class="guide-description">${guide.Descrição}</p>
-                        <a href="${guide.LinkHotmart}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
+                        <span class="guide-category">${categoria || 'Geral'}</span>
+                        <h2 class="guide-title">${titulo || 'Guia Sem Título'}</h2>
+                        <p class="guide-description">${descricao || ''}</p>
+                        <a href="${link || '#'}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
                     </div>
                 `;
                 grid.appendChild(card);
             });
         }
 
-        // Executa a filtragem
         function filterGuides(category, element) {
-            // Atualiza classe ativa nos botões
             document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
             element.classList.add('active');
 
             if (category === 'todos') {
                 renderGuides(allGuides);
             } else {
-                const filtered = allGuides.filter(g => g.Categoria === category);
+                const filtered = allGuides.filter(g => (g.Categoria || g.categoria) === category);
                 renderGuides(filtered);
             }
         }
 
-        // Inicialização geral da página
         window.addEventListener('DOMContentLoaded', () => {
             initAds();
             initGuides();
