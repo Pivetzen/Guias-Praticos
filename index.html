@@ -208,74 +208,53 @@
     </div>
 
     <script>
-        // ID integrado com sucesso
         const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ'; 
         
-        // Mudança estratégica de endpoint para evitar erros de autenticação do Google Visualization
-        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Guias`;
-        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Anuncios`;
+        // Formato seguro gviz estruturado (leitura direta via mapeamento de colunas)
+        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=Guias`;
+        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=Anuncios`;
 
         let allGuides = [];
         let allAds = [];
         let currentAdIndex = 0;
 
-        // Parser resiliente de CSV para quebras de linha e strings complexas
-        function parseCSV(text) {
-            const lines = [];
-            let row = [""];
-            let inQuotes = false;
-
-            for (let i = 0; i < text.length; i++) {
-                let c = text[i];
-                let next = text[i+1];
-
-                if (c === '"') {
-                    if (inQuotes && next === '"') { row[row.length - 1] += '"'; i++; }
-                    else { inQuotes = !inQuotes; }
-                } else if (c === ',' && !inQuotes) {
-                    row.push('');
-                } else if ((c === '\r' || c === '\n') && !inQuotes) {
-                    if (c === '\r' && next === '\n') { i++; }
-                    lines.push(row);
-                    row = [''];
-                } else {
-                    row[row.length - 1] += c;
-                }
-            }
-            if (row.length > 1 || row[0] !== '') {
-                lines.push(row);
-            }
+        // Processador de dados estruturados da API Google Charts
+        async function fetchGoogleSheetData(url) {
+            const response = await fetch(url, { cache: "no-store" });
+            if (!response.ok) throw new Error("Erro na requisição HTTP");
+            const text = await response.text();
             
-            if (lines.length < 2) return [];
-
-            const headers = lines[0].map(h => h.trim());
-            const objects = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i];
-                if (values.length < headers.length) continue;
-                
-                const obj = {};
-                headers.forEach((header, index) => {
-                    obj[header] = values[index] ? values[index].trim() : '';
+            // O Google retorna uma função wrapper "google.visualization.Query.setResponse(...)"
+            // Vamos extrair o JSON puro que fica dentro dos parênteses
+            const jsonStart = text.indexOf('{');
+            const jsonEnd = text.lastIndexOf('}') + 1;
+            const jsonString = text.substring(jsonStart, jsonEnd);
+            const data = JSON.parse(jsonString);
+            
+            const rows = data.table.rows;
+            const cols = data.table.cols.map(c => c.label.trim());
+            
+            // Converte a estrutura de linhas do Google em um array de objetos amigável
+            return rows.map(row => {
+                const item = {};
+                row.c.forEach((cell, index) => {
+                    const columnName = cols[index];
+                    if (columnName) {
+                        item[columnName] = cell && cell.v !== null ? cell.v : '';
+                    }
                 });
-                
-                // Validação de integridade da linha processada
-                const tituloChave = obj['Título'] || obj['titulo'];
-                if (tituloChave && tituloChave.length > 0) {
-                    objects.push(obj);
-                }
-            }
-            return objects;
+                return item;
+            }).filter(item => {
+                // Remove qualquer linha fantasma ou vazia validando se o primeiro campo existe
+                const firstKey = Object.keys(item)[0];
+                return item[firstKey] && item[firstKey].toString().trim() !== '';
+            });
         }
 
-        // Requisição e rotação do banner de anúncios
+        // Busca e rotação do banner de publicidade
         async function initAds() {
             try {
-                const response = await fetch(ADS_URL, { cache: "no-store" });
-                if (!response.ok) throw new Error("Falha HTTP na busca de anúncios");
-                const csvText = await response.text();
-                allAds = parseCSV(csvText);
+                allAds = await fetchGoogleSheetData(ADS_URL);
 
                 if (allAds.length > 0) {
                     const container = document.getElementById('adContainer');
@@ -295,33 +274,27 @@
             const img = document.getElementById('adImage');
             const link = document.getElementById('adLink');
             
-            const imgUrl = ad.ImagemBanner || ad.imagemBanner;
-            const linkDestino = ad.LinkDestino || ad.linkDestino;
-            
-            if (!imgUrl) return;
+            if (!ad.ImagemBanner) return;
 
             img.style.opacity = 0;
             
             setTimeout(() => {
-                img.src = imgUrl;
-                img.alt = ad.AltText || ad.altText || "Propaganda";
-                link.href = linkDestino || "#";
+                img.src = ad.ImagemBanner;
+                img.alt = ad.AltText || "Propaganda";
+                link.href = ad.LinkDestino || "#";
                 img.style.opacity = 1;
             }, 200);
 
             currentAdIndex = (currentAdIndex + 1) % allAds.length;
         }
 
-        // Requisição e renderização dos cards dos e-books
+        // Busca e renderização dinâmica dos e-books
         async function initGuides() {
             try {
-                const response = await fetch(GUIDES_URL, { cache: "no-store" });
-                if (!response.ok) throw new Error("Falha HTTP na busca de guias");
-                const csvText = await response.text();
-                allGuides = parseCSV(csvText);
+                allGuides = await fetchGoogleSheetData(GUIDES_URL);
 
                 if (allGuides.length === 0) {
-                    document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Nenhum guia encontrado na planilha.</div>';
+                    document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Nenhum guia ativo encontrado na planilha.</div>';
                     return;
                 }
 
@@ -329,7 +302,7 @@
                 renderGuides(allGuides);
             } catch (error) {
                 console.error("Erro ao carregar guias:", error);
-                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Verifique se a planilha foi publicada corretamente na web.</div>';
+                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Certifique-se de que o compartilhamento da planilha está definido como "Qualquer pessoa com o link".</div>';
             }
         }
 
@@ -337,7 +310,7 @@
             const container = document.getElementById('filterContainer');
             container.innerHTML = '<button class="filter-btn active" onclick="filterGuides(\'todos\', this)">Todos</button>';
             
-            const categories = [...new Set(allGuides.map(g => g.Categoria || g.categoria))].filter(Boolean);
+            const categories = [...new Set(allGuides.map(g => g.Categoria))].filter(Boolean);
             
             categories.forEach(cat => {
                 const btn = document.createElement('button');
@@ -353,21 +326,15 @@
             grid.innerHTML = '';
 
             guides.forEach(guide => {
-                const titulo = guide.Título || guide.titulo;
-                const category = guide.Categoria || guide.categoria;
-                const descricao = guide.Descrição || guide.descricao;
-                const link = guide.LinkHotmart || guide.linkHotmart;
-                const imgUrl = guide.URLImagem || guide.urlImagem;
-
                 const card = document.createElement('article');
                 card.className = 'guide-card';
                 card.innerHTML = `
-                    <img src="${imgUrl || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" class="guide-image" alt="${titulo}">
+                    <img src="${guide.URLImagem || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" class="guide-image" alt="${guide.Título}">
                     <div class="guide-content">
-                        <span class="guide-category">${category || 'Geral'}</span>
-                        <h2 class="guide-title">${titulo}</h2>
-                        <p class="guide-description">${descricao || ''}</p>
-                        <a href="${link || '#'}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
+                        <span class="guide-category">${guide.Categoria || 'Geral'}</span>
+                        <h2 class="guide-title">${guide.Título || 'Guia Sem Título'}</h2>
+                        <p class="guide-description">${guide.Descrição || ''}</p>
+                        <a href="${guide.LinkHotmart || '#'}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
                     </div>
                 `;
                 grid.appendChild(card);
@@ -381,7 +348,7 @@
             if (category === 'todos') {
                 renderGuides(allGuides);
             } else {
-                const filtered = allGuides.filter(g => (g.Categoria || g.categoria) === category);
+                const filtered = allGuides.filter(g => g.Categoria === category);
                 renderGuides(filtered);
             }
         }
