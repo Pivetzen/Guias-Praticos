@@ -208,8 +208,7 @@
     </div>
 
     <script>
-        // CONFIGURAÇÃO: Certifique-se de que a planilha está em "Arquivo > Compartilhar > Publicar na Web"
-        const SPREADSHEET_ID = '1Xf1mYhLpYt6_Wc8Mh6F-8FfW0u3_P3R6Y-5S8Xz9GvI'; 
+        const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ'; 
         
         const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Guias`;
         const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Anuncios`;
@@ -218,7 +217,7 @@
         let allAds = [];
         let currentAdIndex = 0;
 
-        // Parser de CSV robusto para lidar com as aspas e vírgulas do Google Sheets
+        // Parser avançado de CSV com proteção contra quebras de linhas estruturais
         function parseCSV(text) {
             const lines = [];
             let row = [""];
@@ -258,12 +257,17 @@
                 headers.forEach((header, index) => {
                     obj[header] = values[index] ? values[index].trim() : '';
                 });
-                objects.push(obj);
+                
+                // FILTRO DE SEGURANÇA: Só aceita se a linha tiver de fato um título preenchido
+                const tituloChave = obj['Título'] || obj['titulo'];
+                if (tituloChave && tituloChave.length > 0) {
+                    objects.push(obj);
+                }
             }
             return objects;
         }
 
-        // Carrega e gerencia os anúncios
+        // Inicialização e gerenciamento dos anúncios
         async function initAds() {
             try {
                 const response = await fetch(ADS_URL, { cache: "no-store" });
@@ -288,19 +292,24 @@
             const img = document.getElementById('adImage');
             const link = document.getElementById('adLink');
             
+            const imgUrl = ad.ImagemBanner || ad.imagemBanner;
+            const linkDestino = ad.LinkDestino || ad.linkDestino;
+            
+            if (!imgUrl) return;
+
             img.style.opacity = 0;
             
             setTimeout(() => {
-                img.src = ad.ImagemBanner || ad.imagemBanner; 
+                img.src = imgUrl;
                 img.alt = ad.AltText || ad.altText || "Propaganda";
-                link.href = ad.LinkDestino || ad.linkDestino;
+                link.href = linkDestino || "#";
                 img.style.opacity = 1;
             }, 200);
 
             currentAdIndex = (currentAdIndex + 1) % allAds.length;
         }
 
-        // Carrega e renderiza os guias
+        // Inicialização e renderização dos guias de PDFs
         async function initGuides() {
             try {
                 const response = await fetch(GUIDES_URL, { cache: "no-store" });
@@ -316,13 +325,12 @@
                 renderGuides(allGuides);
             } catch (error) {
                 console.error("Erro ao carregar guias:", error);
-                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Verifique os nomes das abas da planilha.</div>';
+                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Verifique a planilha.</div>';
             }
         }
 
         function renderFilters() {
             const container = document.getElementById('filterContainer');
-            // Remove botões antigos se houver, mantendo apenas o 'Todos'
             container.innerHTML = '<button class="filter-btn active" onclick="filterGuides(\'todos\', this)">Todos</button>';
             
             const categories = [...new Set(allGuides.map(g => g.Categoria || g.categoria))].filter(Boolean);
@@ -342,7 +350,7 @@
 
             guides.forEach(guide => {
                 const titulo = guide.Título || guide.titulo;
-                const categoria = guide.Categoria || guide.categoria;
+                const category = guide.Categoria || guide.categoria;
                 const descricao = guide.Descrição || guide.descricao;
                 const link = guide.LinkHotmart || guide.linkHotmart;
                 const imgUrl = guide.URLImagem || guide.urlImagem;
@@ -352,8 +360,8 @@
                 card.innerHTML = `
                     <img src="${imgUrl || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" class="guide-image" alt="${titulo}">
                     <div class="guide-content">
-                        <span class="guide-category">${categoria || 'Geral'}</span>
-                        <h2 class="guide-title">${titulo || 'Guia Sem Título'}</h2>
+                        <span class="guide-category">${category || 'Geral'}</span>
+                        <h2 class="guide-title">${titulo}</h2>
                         <p class="guide-description">${descricao || ''}</p>
                         <a href="${link || '#'}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
                     </div>
