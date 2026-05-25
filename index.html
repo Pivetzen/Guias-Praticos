@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vitrine de Guias Digitais</title>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --text-color: #333;
+            --bg-color: #f8f9fa;
+            --card-bg: #ffffff;
+            --border-radius: 8px;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            line-height: 1.6;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: 2.5rem;
+            color: #111;
+            margin-bottom: 10px;
+        }
+
+        /* Banner de Propaganda Fixo e Rotativo */
+        .ad-banner-container {
+            width: 100%;
+            max-width: 900px;
+            margin: 0 auto 30px auto;
+            background-color: #eee;
+            border-radius: var(--border-radius);
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            aspect-ratio: 728 / 90; /* Proporção padrão de banner horizontal */
+            display: none; /* Inicia oculto até carregar os dados */
+        }
+
+        .ad-banner-container a {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ad-banner-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        /* Seção de Filtros */
+        .filter-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-bottom: 30px;
+        }
+
+        .filter-btn {
+            background-color: var(--card-bg);
+            border: 1px solid #ccc;
+            padding: 8px 16px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .filter-btn.active, .filter-btn:hover {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+        }
+
+        /* Grid de Guias */
+        .guides-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 25px;
+        }
+
+        .guide-card {
+            background-color: var(--card-bg);
+            border-radius: var(--border-radius);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s ease;
+        }
+
+        .guide-card:hover {
+            transform: translateY(-5px);
+        }
+
+        .guide-image {
+            width: 100%;
+            height: 200px;
+            object-fit: cover;
+            background-color: #eaeaea;
+        }
+
+        .guide-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+        }
+
+        .guide-category {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: var(--primary-color);
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+
+        .guide-title {
+            font-size: 1.2rem;
+            margin-bottom: 10px;
+            color: #222;
+        }
+
+        .guide-description {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 20px;
+            flex-grow: 1;
+        }
+
+        .guide-btn {
+            display: block;
+            text-align: center;
+            background-color: #28a745;
+            color: white;
+            text-decoration: none;
+            padding: 10px;
+            border-radius: var(--border-radius);
+            font-weight: bold;
+            transition: background-color 0.2s;
+        }
+
+        .guide-btn:hover {
+            background-color: #218838;
+        }
+
+        /* Mensagem de carregamento ou lista vazia */
+        .status-msg {
+            text-align: center;
+            grid-column: 1 / -1;
+            padding: 40px;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            .ad-banner-container {
+                aspect-ratio: 320 / 50; /* Proporção mobile para banners */
+            }
+            header h1 {
+                font-size: 1.8rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Nossos Guias Práticos</h1>
+            <p>Selecione a categoria desejada e acesse o material completo na Hotmart.</p>
+        </header>
+
+        <div class="ad-banner-container" id="adContainer">
+            <a href="#" id="adLink" target="_blank" rel="noopener">
+                <img src="" id="adImage" alt="Propaganda">
+            </a>
+        </div>
+
+        <div class="filter-container" id="filterContainer">
+            <button class="filter-btn active" onclick="filterGuides('todos', this)">Todos</button>
+        </div>
+
+        <main class="guides-grid" id="guidesGrid">
+            <div class="status-msg">Carregando guias...</div>
+        </main>
+    </div>
+
+    <script>
+        // CONFIGURAÇÃO: Insira aqui o ID da sua planilha do Google Sheets publicado na web
+        const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ';
+        
+        // URLs para puxar os dados das abas específicas em formato CSV
+        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Guias`;
+        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Anuncios`;
+
+        let allGuides = [];
+        let allAds = [];
+        let currentAdIndex = 0;
+
+        // Função utilitária para converter CSV em Array de Objetos
+        function csvToObjects(csvText) {
+            const lines = csvText.split('\n');
+            const result = [];
+            if (lines.length < 2) return result;
+            
+            // Limpa aspas extras que o Google Sheets coloca
+            const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g, '').trim());
+            
+            for (let i = 1; i < lines.length; i++) {
+                if (!lines[i].trim()) continue;
+                
+                // Regex para separar por vírgulas, respeitando aspas
+                const matches = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || lines[i].split(',');
+                const obj = {};
+                
+                headers.forEach((header, index) => {
+                    let val = matches[index] ? matches[index].replace(/^"|"$/g, '').trim() : '';
+                    obj[header] = val;
+                });
+                result.push(obj);
+            }
+            return result;
+        }
+
+        // Carrega e gerencia os anúncios (Banner)
+        async function initAds() {
+            try {
+                const response = await fetch(ADS_URL);
+                const csvText = await response.text();
+                allAds = csvToObjects(csvText);
+
+                if (allAds.length > 0) {
+                    const container = document.getElementById('adContainer');
+                    container.style.display = 'block';
+                    rotateAds();
+                    // Alterna o banner a cada 5 segundos (5000 milissegundos)
+                    setInterval(rotateAds, 5000);
+                }
+            } catch (error) {
+                console.error("Erro ao carregar anúncios:", error);
+            }
+        }
+
+        function rotateAds() {
+            if (allAds.length === 0) return;
+            const ad = allAds[currentAdIndex];
+            
+            const img = document.getElementById('adImage');
+            const link = document.getElementById('adLink');
+            
+            // Suaviza a troca alterando opacidade
+            img.style.opacity = 0;
+            
+            setTimeout(() => {
+                img.src = ad.ImagemBanner;
+                img.alt = ad.AltText || "Propaganda";
+                link.href = ad.LinkDestino;
+                img.style.opacity = 1;
+            }, 200);
+
+            currentAdIndex = (currentAdIndex + 1) % allAds.length;
+        }
+
+        // Carrega e renderiza os guias e botões de filtros
+        async function initGuides() {
+            try {
+                const response = await fetch(GUIDES_URL);
+                const csvText = await response.text();
+                allGuides = csvToObjects(csvText);
+
+                if (allGuides.length === 0) {
+                    document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Nenhum guia encontrado.</div>';
+                    return;
+                }
+
+                renderFilters();
+                renderGuides(allGuides);
+            } catch (error) {
+                console.error("Erro ao carregar guias:", error);
+                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Verifique a configuração da planilha.</div>';
+            }
+        }
+
+        // Cria os botões de filtros dinamicamente com base nas categorias existentes
+        function renderFilters() {
+            const container = document.getElementById('filterContainer');
+            const categories = [...new Set(allGuides.map(g => g.Categoria))].filter(Boolean);
+            
+            categories.forEach(cat => {
+                const btn = document.createElement('button');
+                btn.className = 'filter-btn';
+                btn.textContent = cat;
+                btn.onclick = (e) => filterGuides(cat, e.target);
+                container.appendChild(btn);
+            });
+        }
+
+        // Renderiza os cards na tela
+        function renderGuides(guides) {
+            const grid = document.getElementById('guidesGrid');
+            grid.innerHTML = '';
+
+            guides.forEach(guide => {
+                const card = document.createElement('article');
+                card.className = 'guide-card';
+                card.innerHTML = `
+                    <img src="${guide.URLImagem || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" class="guide-image" alt="${guide.Título}">
+                    <div class="guide-content">
+                        <span class="guide-category">${guide.Categoria}</span>
+                        <h2 class="guide-title">${guide.Título}</h2>
+                        <p class="guide-description">${guide.Descrição}</p>
+                        <a href="${guide.LinkHotmart}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
+                    </div>
+                `;
+                grid.appendChild(card);
+            });
+        }
+
+        // Executa a filtragem
+        function filterGuides(category, element) {
+            // Atualiza classe ativa nos botões
+            document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+            element.classList.add('active');
+
+            if (category === 'todos') {
+                renderGuides(allGuides);
+            } else {
+                const filtered = allGuides.filter(g => g.Categoria === category);
+                renderGuides(filtered);
+            }
+        }
+
+        // Inicialização geral da página
+        window.addEventListener('DOMContentLoaded', () => {
+            initAds();
+            initGuides();
+        });
+    </script>
+</body>
+</html>
