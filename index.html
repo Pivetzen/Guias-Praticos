@@ -194,7 +194,7 @@
 
         <div class="ad-banner-container" id="adContainer">
             <a href="#" id="adLink" target="_blank" rel="noopener">
-                <img src="" id="adImage" alt="Propaganda">
+                <img src="" id="adImage" alt="Propaganda" onerror="this.src='https://via.placeholder.com/728x90?text=Carregando+Anúncio...'">
             </a>
         </div>
 
@@ -210,7 +210,6 @@
     <script>
         const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ'; 
         
-        // Formato seguro gviz estruturado (leitura direta via mapeamento de colunas)
         const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=Guias`;
         const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=Anuncios`;
 
@@ -224,8 +223,6 @@
             if (!response.ok) throw new Error("Erro na requisição HTTP");
             const text = await response.text();
             
-            // O Google retorna uma função wrapper "google.visualization.Query.setResponse(...)"
-            // Vamos extrair o JSON puro que fica dentro dos parênteses
             const jsonStart = text.indexOf('{');
             const jsonEnd = text.lastIndexOf('}') + 1;
             const jsonString = text.substring(jsonStart, jsonEnd);
@@ -234,7 +231,6 @@
             const rows = data.table.rows;
             const cols = data.table.cols.map(c => c.label.trim());
             
-            // Converte a estrutura de linhas do Google em um array de objetos amigável
             return rows.map(row => {
                 const item = {};
                 row.c.forEach((cell, index) => {
@@ -245,7 +241,6 @@
                 });
                 return item;
             }).filter(item => {
-                // Remove qualquer linha fantasma ou vazia validando se o primeiro campo existe
                 const firstKey = Object.keys(item)[0];
                 return item[firstKey] && item[firstKey].toString().trim() !== '';
             });
@@ -328,8 +323,12 @@
             guides.forEach(guide => {
                 const card = document.createElement('article');
                 card.className = 'guide-card';
+                // onerror adicionado para tratar caminhos errados ou arquivos ausentes sem quebrar o layout
                 card.innerHTML = `
-                    <img src="${guide.URLImagem || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" class="guide-image" alt="${guide.Título}">
+                    <img src="${guide.URLImagem || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" 
+                         class="guide-image" 
+                         alt="${guide.Título}" 
+                         onerror="this.src='https://via.placeholder.com/300x200?text=Imagem+Não+Encontrada'">
                     <div class="guide-content">
                         <span class="guide-category">${guide.Categoria || 'Geral'}</span>
                         <h2 class="guide-title">${guide.Título || 'Guia Sem Título'}</h2>
