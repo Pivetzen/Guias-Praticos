@@ -208,16 +208,18 @@
     </div>
 
     <script>
+        // ID integrado com sucesso
         const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ'; 
         
-        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Guias`;
-        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:csv&sheet=Anuncios`;
+        // Mudança estratégica de endpoint para evitar erros de autenticação do Google Visualization
+        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Guias`;
+        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Anuncios`;
 
         let allGuides = [];
         let allAds = [];
         let currentAdIndex = 0;
 
-        // Parser avançado de CSV com proteção contra quebras de linhas estruturais
+        // Parser resiliente de CSV para quebras de linha e strings complexas
         function parseCSV(text) {
             const lines = [];
             let row = [""];
@@ -258,7 +260,7 @@
                     obj[header] = values[index] ? values[index].trim() : '';
                 });
                 
-                // FILTRO DE SEGURANÇA: Só aceita se a linha tiver de fato um título preenchido
+                // Validação de integridade da linha processada
                 const tituloChave = obj['Título'] || obj['titulo'];
                 if (tituloChave && tituloChave.length > 0) {
                     objects.push(obj);
@@ -267,10 +269,11 @@
             return objects;
         }
 
-        // Inicialização e gerenciamento dos anúncios
+        // Requisição e rotação do banner de anúncios
         async function initAds() {
             try {
                 const response = await fetch(ADS_URL, { cache: "no-store" });
+                if (!response.ok) throw new Error("Falha HTTP na busca de anúncios");
                 const csvText = await response.text();
                 allAds = parseCSV(csvText);
 
@@ -309,10 +312,11 @@
             currentAdIndex = (currentAdIndex + 1) % allAds.length;
         }
 
-        // Inicialização e renderização dos guias de PDFs
+        // Requisição e renderização dos cards dos e-books
         async function initGuides() {
             try {
                 const response = await fetch(GUIDES_URL, { cache: "no-store" });
+                if (!response.ok) throw new Error("Falha HTTP na busca de guias");
                 const csvText = await response.text();
                 allGuides = parseCSV(csvText);
 
@@ -325,7 +329,7 @@
                 renderGuides(allGuides);
             } catch (error) {
                 console.error("Erro ao carregar guias:", error);
-                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Verifique a planilha.</div>';
+                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Verifique se a planilha foi publicada corretamente na web.</div>';
             }
         }
 
