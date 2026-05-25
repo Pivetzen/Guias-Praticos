@@ -305,20 +305,20 @@
                         if (!this.getAttribute('data-retry')) {
                             this.setAttribute('data-retry', 'true');
                             
-                            // Normaliza o caminho base do repositório no GitHub Pages de forma robusta
-                            let basePath = window.location.pathname;
-                            if (!basePath.endsWith('/')) {
-                                basePath = basePath.substring(0, basePath.lastIndexOf('/') + 1);
+                            // Monta de forma limpa a URL absoluta para o GitHub Pages
+                            let originClean = window.location.origin + window.location.pathname;
+                            if (!originClean.endsWith('/')) {
+                                originClean += '/';
                             }
                             
-                            const relativeSrc = this.src.replace(window.location.origin, '').replace(/^\//, '');
-                            // Remove caminhos duplicados se houver
-                            const cleanRelativeSrc = relativeSrc.replace('Guias-Praticos/', '');
+                            // Extrai o caminho relativo puro limpando o domínio
+                            let relativePath = this.src.replace(window.location.origin, '').replace(/^\//, '');
+                            relativePath = relativePath.replace('Guias-Praticos/', '');
                             
-                            this.src = window.location.origin + basePath + cleanRelativeSrc;
+                            this.src = originClean + relativePath;
                             return;
                         }
-                        // Se falhar mesmo assim, esconde o ícone quebrado mas mantém a área e o Link funcionando
+                        // Oculta o ícone quebrado mas mantém a tag <a> 100% clicável no bloco
                         this.style.display = 'none';
                     };
 
@@ -342,10 +342,10 @@
             if (!ad.ImagemBanner) return;
 
             img.style.opacity = 0;
-            img.style.display = 'block'; // Garante o reset caso tenha entrado em onerror
+            img.style.display = 'block'; 
             img.removeAttribute('data-retry'); 
             
-            // Atribui o link primeiro para que a área fique clicável imediatamente
+            // Aplica os links imediatamente para garantir o clique
             link.href = ad.LinkDestino || "#";
             link.title = ad.AltText || "Propaganda";
             
