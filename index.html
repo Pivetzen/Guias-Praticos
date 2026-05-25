@@ -214,8 +214,9 @@
     <script>
         const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ'; 
         
-        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Guias`;
-        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Anuncios`;
+        // Adicionado timestamp dinâmico (?t=...) para quebrar qualquer cache do Google de forma agressiva
+        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Guias&t=${Date.now()}`;
+        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Anuncios&t=${Date.now()}`;
 
         let allGuides = [];
         let allAds = [];
@@ -262,21 +263,26 @@
             return basePath + cleanPath;
         }
 
-        // Mapeia rigidamente as posições da aba Anúncios: Coluna 0 (Imagem), Coluna 1 (Link), Coluna 2 (Alt)
+        // Processa a aba Anúncios validando rigorosamente o cabeçalho correto
         function parseAdsCSV(text) {
             const lines = csvToArray(text);
             if (lines.length < 2) return [];
 
-            const objects = [];
+            // Validação de Segurança: verifica se o cabeçalho realmente pertence à aba de Anúncios
+            const firstRowText = lines[0].join('').toLowerCase();
+            if (firstRowText.includes('linkhotmart') || firstRowText.includes('descri') || firstRowText.includes('tando seu caozinho')) {
+                console.warn("Aviso: O Google Sheets retornou a aba errada (Guias) ao tentar carregar os Anúncios.");
+                return [];
+            }
 
+            const objects = [];
             for (let i = 1; i < lines.length; i++) {
                 const row = lines[i];
-                // Pega estritamente pelos índices das colunas da aba Anúncios
                 const imgVal = row[0]; 
                 const linkVal = row[1];
                 const altVal = row[2];
 
-                if (imgVal && imgVal.trim() !== '') {
+                if (imgVal && imgVal.trim() !== '' && !imgVal.toLowerCase().includes('imagembanner')) {
                     objects.push({
                         ImagemBanner: imgVal.trim(),
                         LinkDestino: linkVal ? linkVal.trim() : '#',
@@ -287,16 +293,22 @@
             return objects;
         }
 
-        // Mapeia rigidamente as posições da aba Guias: 0 (Título), 1 (Categoria), 2 (Descrição), 3 (Link), 4 (Imagem)
+        // Processa a aba Guias validando rigorosamente o cabeçalho correto
         function parseGuidesCSV(text) {
             const lines = csvToArray(text);
             if (lines.length < 2) return [];
 
-            const objects = [];
+            // Validação de Segurança: verifica se o cabeçalho não pertence à aba de Anúncios
+            const firstRowText = lines[0].join('').toLowerCase();
+            if (firstRowText.includes('imagembanner') || firstRowText.includes('linkdestino')) {
+                console.warn("Aviso: O Google Sheets retornou a aba errada (Anúncios) ao tentar carregar os Guias.");
+                return [];
+            }
 
+            const objects = [];
             for (let i = 1; i < lines.length; i++) {
                 const row = lines[i];
-                if (!row[0] || row[0].trim() === '') continue;
+                if (!row[0] || row[0].trim() === '' || row[0].toLowerCase().includes('título')) continue;
 
                 objects.push({
                     Título: row[0] ? row[0].trim() : '',
@@ -323,11 +335,17 @@
                     
                     rotateAds();
                     if (allAds.length > 1) {
-                        setInterval(rotateAds, 5000);
+                        // Limpa qualquer intervalo anterior para evitar duplicações
+                        if (window.adInterval) clearInterval(window.adInterval);
+                        window.adInterval = setInterval(rotateAds, 5000);
                     }
+                } else {
+                    // Oculta completamente o container se os dados vierem inválidos ou vazios
+                    document.getElementById('adContainer').style.display = 'none';
                 }
             } catch (error) {
                 console.error("Erro ao carregar anúncios:", error);
+                document.getElementById('adContainer').style.display = 'none';
             }
         }
 
@@ -338,7 +356,7 @@
             const img = document.getElementById('adImage');
             const link = document.getElementById('adLink');
             
-            if (!ad.ImagemBanner) return;
+            if (!ad || !ad.ImagemBanner) return;
 
             img.style.opacity = 0;
             img.style.display = 'block'; 
