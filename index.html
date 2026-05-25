@@ -221,7 +221,8 @@
         let allAds = [];
         let currentAdIndex = 0;
 
-        function parseCSV(text) {
+        // Transforma o texto bruto do CSV em uma matriz pura de linhas e colunas
+        function csvToArray(text) {
             const lines = [];
             let row = [""];
             let inQuotes = false;
@@ -246,58 +247,16 @@
             if (row.length > 1 || row[0] !== '') {
                 lines.push(row);
             }
-            
-            if (lines.length < 2) return [];
-
-            const headers = lines[0].map(h => h.replace(/^"|"$/g, '').trim());
-            const objects = [];
-
-            for (let i = 1; i < lines.length; i++) {
-                const values = lines[i];
-                if (values.length < headers.length) continue;
-                
-                const obj = {};
-                headers.forEach((header, index) => {
-                    let val = values[index] ? values[index].trim() : '';
-                    val = val.replace(/^"|"$/g, '').trim();
-                    obj[header] = val;
-                });
-                
-                if (headers.includes('Título') || headers.includes('titulo')) {
-                    const titulo = obj['Título'] || obj['titulo'] || obj['TITULO'];
-                    if (titulo) {
-                        objects.push({
-                            Título: titulo,
-                            Categoria: obj['Categoria'] || obj['categoria'] || 'Geral',
-                            Descrição: obj['Descrição'] || obj['descricao'] || '',
-                            LinkHotmart: obj['LinkHotmart'] || obj['linkHotmart'] || '#',
-                            URLImagem: obj['URLImagem'] || obj['urlImagem'] || ''
-                        });
-                    }
-                } else if (headers.includes('ImagemBanner') || headers.includes('imagemBanner')) {
-                    const imagemBanner = obj['ImagemBanner'] || obj['imagemBanner'] || obj['IMAGEMBANNER'];
-                    if (imagemBanner) {
-                        objects.push({
-                            ImagemBanner: imagemBanner,
-                            LinkDestino: obj['LinkDestino'] || obj['linkDestino'] || '#',
-                            AltText: obj['AltText'] || obj['altText'] || 'Propaganda'
-                        });
-                    }
-                }
-            }
-            return objects;
+            return lines.filter(line => line.some(cell => cell.trim() !== ''));
         }
 
-        // Função auxiliar para construir URLs seguras no GitHub Pages
+        // Reconstrói URLs de forma limpa para evitar erros de caminhos no GitHub Pages
         function buildAbsoluteURL(rawPath) {
             if (!rawPath) return '';
             if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
                 return rawPath;
             }
-            // Remove barras extras ou aspas do início do caminho vindo da planilha
             let cleanPath = rawPath.replace(/^["'\/]+|["'\s]+$/g, '');
-            
-            // Pega o caminho base do site (ex: https://pivetzen.github.io/Guias-Praticos/)
             let basePath = window.location.origin + window.location.pathname;
             if (!basePath.endsWith('/')) {
                 basePath += '/';
@@ -305,25 +264,71 @@
             return basePath + cleanPath;
         }
 
+        // Processa especificamente a estrutura da aba de Anúncios de forma posicional (independente de falhas de cabeçalho)
+        function parseAdsCSV(text) {
+            const lines = csvToArray(text);
+            if (lines.length < 2) return [];
+
+            const objects = [];
+            // Localiza os índices reais baseado no que foi limpo na primeira linha
+            const headers = lines[0].map(h => h.replace(/[^a-zA-Z0-9]/g, '').toLowerCase());
+            
+            const idxImg = headers.indexOf('imagembanner');
+            const idxLink = headers.indexOf('linkdestino');
+            const idxAlt = headers.indexOf('alttext');
+
+            for (let i = 1; i < lines.length; i++) {
+                const row = lines[i];
+                const imgVal = row[idxImg !== -1 ? idxImg : 0];
+                const linkVal = row[idxLink !== -1 ? idxLink : 1];
+                const altVal = row[idxAlt !== -1 ? idxAlt : 2];
+
+                if (imgVal && imgVal.trim() !== '') {
+                    objects.push({
+                        ImagemBanner: imgVal.trim(),
+                        LinkDestino: linkVal ? linkVal.trim() : '#',
+                        AltText: altVal ? altVal.trim() : 'Propaganda'
+                    });
+                }
+            }
+            return objects;
+        }
+
+        // Processa especificamente a estrutura da aba de Guias
+        function parseGuidesCSV(text) {
+            const lines = csvToArray(text);
+            if (lines.length < 2) return [];
+
+            const objects = [];
+            const headers = lines[0].map(h => h.replace(/[^a-zA-Z0-9Título|titulo]/g, '').trim());
+
+            for (let i = 1; i < lines.length; i++) {
+                const row = lines[i];
+                if (row.length === 0 || !row[0]) continue;
+
+                objects.push({
+                    Título: row[0] ? row[0].trim() : '',
+                    Categoria: row[1] ? row[1].trim() : 'Geral',
+                    Descrição: row[2] ? row[2].trim() : '',
+                    LinkHotmart: row[3] ? row[3].trim() : '#',
+                    URLImagem: row[4] ? row[4].trim() : ''
+                });
+            }
+            return objects;
+        }
+
         async function initAds() {
             try {
                 const response = await fetch(ADS_URL, { cache: "no-store" });
                 if (!response.ok) throw new Error("Erro ao baixar aba de anúncios");
                 const csvText = await response.text();
-                allAds = parseCSV(csvText);
+                
+                allAds = parseAdsCSV(csvText);
 
                 if (allAds.length > 0) {
                     const container = document.getElementById('adContainer');
                     container.style.display = 'block';
                     
-                    const img = document.getElementById('adImage');
-                    
-                    img.onerror = function() {
-                        // Se mesmo com a URL absoluta falhar (arquivo faltando no repositório),
-                        // oculta o ícone quebrado para manter o design profissional, mas deixa o link clicável.
-                        this.style.display = 'none';
-                    };
-
                     rotateAds();
                     if (allAds.length > 1) {
                         setInterval(rotateAds, 5000);
@@ -344,7 +349,6 @@
             if (!ad.ImagemBanner) return;
 
             img.style.opacity = 0;
-            img.style.display = 'block'; 
             
             link.href = ad.LinkDestino || "#";
             link.title = ad.AltText || "Propaganda";
@@ -363,7 +367,8 @@
                 const response = await fetch(GUIDES_URL, { cache: "no-store" });
                 if (!response.ok) throw new Error("Erro ao baixar aba de guias");
                 const csvText = await response.text();
-                allGuides = parseCSV(csvText);
+                
+                allGuides = parseGuidesCSV(csvText);
 
                 if (allGuides.length === 0) {
                     document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Nenhum guia ativo encontrado na planilha.</div>';
