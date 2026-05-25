@@ -54,7 +54,6 @@
             box-shadow: 0 2px 8px rgba(0,0,0,0.05);
             aspect-ratio: 728 / 90;
             display: none;
-            position: relative;
         }
 
         .ad-banner-container a {
@@ -62,8 +61,8 @@
             width: 100%;
             height: 100%;
             cursor: pointer;
+            text-decoration: none;
             position: relative;
-            z-index: 10;
         }
 
         .ad-banner-container img {
@@ -199,7 +198,7 @@
 
         <div class="ad-banner-container" id="adContainer">
             <a href="#" id="adLink" target="_blank" rel="noopener">
-                <img src="" id="adImage" alt="Propaganda">
+                <img src="" id="adImage" alt="">
             </a>
         </div>
 
@@ -301,10 +300,26 @@
                     container.style.display = 'block';
                     
                     const img = document.getElementById('adImage');
+                    
                     img.onerror = function() {
-                        this.removeAttribute('alt');
-                        this.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='728' height='90' style='background:%23eaeaea;'></svg>";
-                        this.style.opacity = 1;
+                        if (!this.getAttribute('data-retry')) {
+                            this.setAttribute('data-retry', 'true');
+                            
+                            // Normaliza o caminho base do repositório no GitHub Pages de forma robusta
+                            let basePath = window.location.pathname;
+                            if (!basePath.endsWith('/')) {
+                                basePath = basePath.substring(0, basePath.lastIndexOf('/') + 1);
+                            }
+                            
+                            const relativeSrc = this.src.replace(window.location.origin, '').replace(/^\//, '');
+                            // Remove caminhos duplicados se houver
+                            const cleanRelativeSrc = relativeSrc.replace('Guias-Praticos/', '');
+                            
+                            this.src = window.location.origin + basePath + cleanRelativeSrc;
+                            return;
+                        }
+                        // Se falhar mesmo assim, esconde o ícone quebrado mas mantém a área e o Link funcionando
+                        this.style.display = 'none';
                     };
 
                     rotateAds();
@@ -327,11 +342,16 @@
             if (!ad.ImagemBanner) return;
 
             img.style.opacity = 0;
+            img.style.display = 'block'; // Garante o reset caso tenha entrado em onerror
+            img.removeAttribute('data-retry'); 
+            
+            // Atribui o link primeiro para que a área fique clicável imediatamente
+            link.href = ad.LinkDestino || "#";
+            link.title = ad.AltText || "Propaganda";
             
             setTimeout(() => {
                 img.src = ad.ImagemBanner;
                 img.alt = ad.AltText || "Propaganda";
-                link.href = ad.LinkDestino || "#";
                 img.style.opacity = 1;
             }, 150);
 
