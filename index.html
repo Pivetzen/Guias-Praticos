@@ -264,24 +264,27 @@
                     obj[header] = val;
                 });
                 
-                // Mapeamento dinâmico para evitar quebras por diferença de maiúsculas/minúsculas
-                const titulo = obj['Título'] || obj['titulo'] || obj['TITULO'];
-                const imagemBanner = obj['ImagemBanner'] || obj['imagemBanner'] || obj['IMAGEMBANNER'];
-                
-                if (titulo && titulo.length > 0) {
-                    objects.push({
-                        Título: titulo,
-                        Categoria: obj['Categoria'] || obj['categoria'] || 'Geral',
-                        Descrição: obj['Descrição'] || obj['descricao'] || '',
-                        LinkHotmart: obj['LinkHotmart'] || obj['linkHotmart'] || '#',
-                        URLImagem: obj['URLImagem'] || obj['urlImagem'] || ''
-                    });
-                } else if (imagemBanner && imagemBanner.length > 0) {
-                    objects.push({
-                        ImagemBanner: imagemBanner,
-                        LinkDestino: obj['LinkDestino'] || obj['linkDestino'] || '#',
-                        AltText: obj['AltText'] || obj['altText'] || 'Propaganda'
-                    });
+                // Validação explícita baseada nas colunas existentes de cada aba
+                if (headers.includes('Título') || headers.includes('titulo')) {
+                    const titulo = obj['Título'] || obj['titulo'] || obj['TITULO'];
+                    if (titulo) {
+                        objects.push({
+                            Título: titulo,
+                            Categoria: obj['Categoria'] || obj['categoria'] || 'Geral',
+                            Descrição: obj['Descrição'] || obj['descricao'] || '',
+                            LinkHotmart: obj['LinkHotmart'] || obj['linkHotmart'] || '#',
+                            URLImagem: obj['URLImagem'] || obj['urlImagem'] || ''
+                        });
+                    }
+                } else if (headers.includes('ImagemBanner') || headers.includes('imagemBanner')) {
+                    const imagemBanner = obj['ImagemBanner'] || obj['imagemBanner'] || obj['IMAGEMBANNER'];
+                    if (imagemBanner) {
+                        objects.push({
+                            ImagemBanner: imagemBanner,
+                            LinkDestino: obj['LinkDestino'] || obj['linkDestino'] || '#',
+                            AltText: obj['AltText'] || obj['altText'] || 'Propaganda'
+                        });
+                    }
                 }
             }
             return objects;
@@ -298,11 +301,11 @@
                     const container = document.getElementById('adContainer');
                     container.style.display = 'block';
                     
-                    // Configura o monitor de erro caso o caminho da imagem no GitHub esteja errado
                     const img = document.getElementById('adImage');
                     img.onerror = function() {
-                        this.src = 'https://via.placeholder.com/728x90?text=Verifique+o+caminho+da+imagem+no+GitHub';
-                        this.style.opacity = 1; // Força exibição mesmo com erro
+                        this.removeAttribute('alt');
+                        this.src = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='728' height='90' style='background:%23eaeaea;'></svg>";
+                        this.style.opacity = 1;
                     };
 
                     rotateAds();
