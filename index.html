@@ -288,6 +288,23 @@
             return objects;
         }
 
+        // Função auxiliar para construir URLs seguras no GitHub Pages
+        function buildAbsoluteURL(rawPath) {
+            if (!rawPath) return '';
+            if (rawPath.startsWith('http://') || rawPath.startsWith('https://')) {
+                return rawPath;
+            }
+            // Remove barras extras ou aspas do início do caminho vindo da planilha
+            let cleanPath = rawPath.replace(/^["'\/]+|["'\s]+$/g, '');
+            
+            // Pega o caminho base do site (ex: https://pivetzen.github.io/Guias-Praticos/)
+            let basePath = window.location.origin + window.location.pathname;
+            if (!basePath.endsWith('/')) {
+                basePath += '/';
+            }
+            return basePath + cleanPath;
+        }
+
         async function initAds() {
             try {
                 const response = await fetch(ADS_URL, { cache: "no-store" });
@@ -302,23 +319,8 @@
                     const img = document.getElementById('adImage');
                     
                     img.onerror = function() {
-                        if (!this.getAttribute('data-retry')) {
-                            this.setAttribute('data-retry', 'true');
-                            
-                            // Monta de forma limpa a URL absoluta para o GitHub Pages
-                            let originClean = window.location.origin + window.location.pathname;
-                            if (!originClean.endsWith('/')) {
-                                originClean += '/';
-                            }
-                            
-                            // Extrai o caminho relativo puro limpando o domínio
-                            let relativePath = this.src.replace(window.location.origin, '').replace(/^\//, '');
-                            relativePath = relativePath.replace('Guias-Praticos/', '');
-                            
-                            this.src = originClean + relativePath;
-                            return;
-                        }
-                        // Oculta o ícone quebrado mas mantém a tag <a> 100% clicável no bloco
+                        // Se mesmo com a URL absoluta falhar (arquivo faltando no repositório),
+                        // oculta o ícone quebrado para manter o design profissional, mas deixa o link clicável.
                         this.style.display = 'none';
                     };
 
@@ -343,14 +345,12 @@
 
             img.style.opacity = 0;
             img.style.display = 'block'; 
-            img.removeAttribute('data-retry'); 
             
-            // Aplica os links imediatamente para garantir o clique
             link.href = ad.LinkDestino || "#";
             link.title = ad.AltText || "Propaganda";
             
             setTimeout(() => {
-                img.src = ad.ImagemBanner;
+                img.src = buildAbsoluteURL(ad.ImagemBanner);
                 img.alt = ad.AltText || "Propaganda";
                 img.style.opacity = 1;
             }, 150);
@@ -403,7 +403,7 @@
                 const card = document.createElement('article');
                 card.className = 'guide-card';
                 card.innerHTML = `
-                    <img src="${guide.URLImagem || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" 
+                    <img src="${buildAbsoluteURL(guide.URLImagem) || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" 
                          class="guide-image" 
                          alt="${guide.Título}" 
                          onerror="this.src='https://via.placeholder.com/300x200?text=Imagem+Não+Encontrada'">
