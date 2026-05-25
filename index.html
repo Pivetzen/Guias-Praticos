@@ -210,46 +210,83 @@
     <script>
         const SPREADSHEET_ID = '1UHVA1NHRn0S2i9gxPGWN9ZqsvkROhZ5GN2BuSDtZVgQ'; 
         
-        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=Guias`;
-        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?sheet=Anuncios`;
+        // Uso de endpoint estável e imutável de exportação de texto limpo CSV
+        const GUIDES_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Guias`;
+        const ADS_URL = `https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/export?format=csv&sheet=Anuncios`;
 
         let allGuides = [];
         let allAds = [];
         let currentAdIndex = 0;
 
-        // Processador de dados estruturados da API Google Charts
-        async function fetchGoogleSheetData(url) {
-            const response = await fetch(url, { cache: "no-store" });
-            if (!response.ok) throw new Error("Erro na requisição HTTP");
-            const text = await response.text();
+        // Interpretador e limpador robusto de CSV nativo
+        function parseCSV(text) {
+            const lines = [];
+            let row = [""];
+            let inQuotes = false;
+
+            for (let i = 0; i < text.length; i++) {
+                let c = text[i];
+                let next = text[i+1];
+
+                if (c === '"') {
+                    if (inQuotes && next === '"') { row[row.length - 1] += '"'; i++; }
+                    else { inQuotes = !inQuotes; }
+                } else if (c === ',' && !inQuotes) {
+                    row.push('');
+                } else if ((c === '\r' || c === '\n') && !inQuotes) {
+                    if (c === '\r' && next === '\n') { i++; }
+                    lines.push(row);
+                    row = [''];
+                } else {
+                    row[row.length - 1] += c;
+                }
+            }
+            if (row.length > 1 || row[0] !== '') {
+                lines.push(row);
+            }
             
-            const jsonStart = text.indexOf('{');
-            const jsonEnd = text.lastIndexOf('}') + 1;
-            const jsonString = text.substring(jsonStart, jsonEnd);
-            const data = JSON.parse(jsonString);
-            
-            const rows = data.table.rows;
-            const cols = data.table.cols.map(c => c.label.trim());
-            
-            return rows.map(row => {
-                const item = {};
-                row.c.forEach((cell, index) => {
-                    const columnName = cols[index];
-                    if (columnName) {
-                        item[columnName] = cell && cell.v !== null ? cell.v : '';
-                    }
+            if (lines.length < 2) return [];
+
+            const headers = lines[0].map(h => h.replace(/^"|"$/g, '').trim());
+            const objects = [];
+
+            for (let i = 1; i < lines.length; i++) {
+                const values = lines[i];
+                if (values.length < headers.length) continue;
+                
+                const obj = {};
+                headers.forEach((header, index) => {
+                    let val = values[index] ? values[index].trim() : '';
+                    // Remove aspas extras remanescentes da conversão de string do CSV
+                    val = val.replace(/^"|"$/g, '').trim();
+                    obj[header] = val;
                 });
-                return item;
-            }).filter(item => {
-                const firstKey = Object.keys(item)[0];
-                return item[firstKey] && item[firstKey].toString().trim() !== '';
-            });
+                
+                // Mapeia variações de caixa alta/baixa comuns
+                const titulo = obj['Título'] || obj['titulo'] || obj['Título'];
+                if (titulo && titulo.length > 0) {
+                    objects.push({
+                        Título: titulo,
+                        Categoria: obj['Categoria'] || obj['categoria'] || 'Geral',
+                        Descrição: obj['Descrição'] || obj['descricao'] || '',
+                        LinkHotmart: obj['LinkHotmart'] || obj['linkHotmart'] || '#',
+                        URLImagem: obj['URLImagem'] || obj['urlImagem'] || '',
+                        ImagemBanner: obj['ImagemBanner'] || obj['imagemBanner'] || '',
+                        LinkDestino: obj['LinkDestino'] || obj['linkDestino'] || '#',
+                        AltText: obj['AltText'] || obj['altText'] || 'Propaganda'
+                    });
+                }
+            }
+            return objects;
         }
 
-        // Busca e rotação do banner de publicidade
+        // Carregamento estável dos anúncios
         async function initAds() {
             try {
-                allAds = await fetchGoogleSheetData(ADS_URL);
+                const response = await fetch(ADS_URL, { cache: "no-store" });
+                if (!response.ok) throw new Error("Erro ao baixar aba de anúncios");
+                const csvText = await response.text();
+                allAds = parseCSV(csvText);
 
                 if (allAds.length > 0) {
                     const container = document.getElementById('adContainer');
@@ -269,12 +306,13 @@
             const img = document.getElementById('adImage');
             const link = document.getElementById('adLink');
             
-            if (!ad.ImagemBanner) return;
+            const imgPath = ad.ImagemBanner;
+            if (!imgPath) return;
 
             img.style.opacity = 0;
             
             setTimeout(() => {
-                img.src = ad.ImagemBanner;
+                img.src = imgPath;
                 img.alt = ad.AltText || "Propaganda";
                 link.href = ad.LinkDestino || "#";
                 img.style.opacity = 1;
@@ -283,10 +321,13 @@
             currentAdIndex = (currentAdIndex + 1) % allAds.length;
         }
 
-        // Busca e renderização dinâmica dos e-books
+        // Carregamento e estruturação dos cards
         async function initGuides() {
             try {
-                allGuides = await fetchGoogleSheetData(GUIDES_URL);
+                const response = await fetch(GUIDES_URL, { cache: "no-store" });
+                if (!response.ok) throw new Error("Erro ao baixar aba de guias");
+                const csvText = await response.text();
+                allGuides = parseCSV(csvText);
 
                 if (allGuides.length === 0) {
                     document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Nenhum guia ativo encontrado na planilha.</div>';
@@ -297,7 +338,7 @@
                 renderGuides(allGuides);
             } catch (error) {
                 console.error("Erro ao carregar guias:", error);
-                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao carregar os dados. Certifique-se de que o compartilhamento da planilha está definido como "Qualquer pessoa com o link".</div>';
+                document.getElementById('guidesGrid').innerHTML = '<div class="status-msg">Erro ao sincronizar dados. Verifique a ligação com a planilha.</div>';
             }
         }
 
@@ -323,17 +364,16 @@
             guides.forEach(guide => {
                 const card = document.createElement('article');
                 card.className = 'guide-card';
-                // onerror adicionado para tratar caminhos errados ou arquivos ausentes sem quebrar o layout
                 card.innerHTML = `
                     <img src="${guide.URLImagem || 'https://via.placeholder.com/300x200?text=Sem+Foto'}" 
                          class="guide-image" 
                          alt="${guide.Título}" 
                          onerror="this.src='https://via.placeholder.com/300x200?text=Imagem+Não+Encontrada'">
                     <div class="guide-content">
-                        <span class="guide-category">${guide.Categoria || 'Geral'}</span>
-                        <h2 class="guide-title">${guide.Título || 'Guia Sem Título'}</h2>
-                        <p class="guide-description">${guide.Descrição || ''}</p>
-                        <a href="${guide.LinkHotmart || '#'}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
+                        <span class="guide-category">${guide.Categoria}</span>
+                        <h2 class="guide-title">${guide.Título}</h2>
+                        <p class="guide-description">${guide.Descrição}</p>
+                        <a href="${guide.LinkHotmart}" class="guide-btn" target="_blank" rel="noopener">Adquirir na Hotmart</a>
                     </div>
                 `;
                 grid.appendChild(card);
